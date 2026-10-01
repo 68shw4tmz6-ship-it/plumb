@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron?task=quotes", "schedule": "0 22 * * *" },
+    { "path": "/api/cron?task=end-of-day", "schedule": "0 5 * * 1-5" }
+  ]
+}
