@@ -1,28 +1,47 @@
-@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
 
-/* Palette carried over from Site Tracker v1 (the app before it was renamed Plumb) */
+/* Plumb brand tokens. Source of truth: the "Plumb Brand" design system. */
 :root {
-  --paper: #edeae1;
-  --paper-dark: #e2ddd0;
-  --card: #ffffff;
-  --ink: #1c231f;
-  --ink-soft: #5b6259;
-  --line: #c7c0ae;
-  --line-soft: #ded8c9;
-  --accent: #28374a;
-  --accent-soft: #d8dfe9;
-  --steel: #3c5a6c;
-  --steel-soft: #d8e2e6;
-  --ok: #3e7a4c;
-  --ok-soft: #d9e7dc;
-  --amber: #a8813b;
-  --amber-soft: #f0e6d2;
-  --danger: #9b3b2f;
-  --danger-soft: #f2dcd7;
+  --surface: #e9edf0;
+  --surface-raised: #ffffff;
+  --surface-sunken: #dde3e8;
+  --line: #c5ced6;
+  --line-soft: #dce2e7;
+  --ink: #0f2236;
+  --ink-soft: #51606e;
+  --steel: #1d3f5c;
+  --steel-soft: #d5e0ea;
+  --orange: #f2650f;
+  --on-orange: #0f2236;
+  --orange-text: #ae4407;
+  --orange-soft: #fde6d6;
+  --night: #12293d;
+  --night-ink: #e6edf3;
+  --night-muted: #9fb3c6;
+  --night-line: #25415a;
+  --ok: #2a7448;
+  --ok-soft: #d9ebdf;
+  --warn-text: #7a5210;
+  --warn-soft: #f6e9cc;
+  --danger: #a8322a;
+  --danger-soft: #f6dcd8;
+
+  /* Legacy names used across the app, mapped onto the brand tokens */
+  --paper: var(--surface);
+  --paper-dark: var(--surface-sunken);
+  --card: var(--surface-raised);
+  --accent: var(--steel);
+  --accent-soft: var(--steel-soft);
+  --amber: var(--warn-text);
+  --amber-soft: var(--warn-soft);
+
   --radius: 6px;
-  --shadow: 0 1px 2px rgba(28, 35, 31, 0.06), 0 6px 18px rgba(28, 35, 31, 0.05);
-  --head: "Barlow Condensed", "Inter", system-ui, sans-serif;
-  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --radius-sm: 4px;
+  --radius-lg: 10px;
+  --shadow: 0 1px 2px rgba(15, 34, 54, 0.06), 0 6px 18px rgba(15, 34, 54, 0.06);
+  --head: "Big Shoulders Display", "Archivo Narrow", Impact, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 }
 
 * {
@@ -50,19 +69,20 @@ h3,
 h4 {
   font-family: var(--head);
   font-weight: 700;
-  line-height: 1.08;
+  line-height: 1.05;
   margin: 0;
   letter-spacing: 0.01em;
 }
 
 h1 {
-  font-size: 32px;
+  font-size: 38px;
+  font-weight: 800;
 }
 h2 {
-  font-size: 24px;
+  font-size: 27px;
 }
 h3 {
-  font-size: 19px;
+  font-size: 21px;
 }
 
 a {
@@ -79,8 +99,8 @@ a {
 .sidebar {
   width: 232px;
   flex: 0 0 232px;
-  background: var(--accent);
-  color: #e9edf2;
+  background: var(--night);
+  color: var(--night-ink);
   padding: 20px 14px;
   display: flex;
   flex-direction: column;
@@ -92,24 +112,22 @@ a {
 }
 
 .brand {
-  font-family: var(--head);
-  font-size: 21px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.02em;
-  line-height: 1.1;
-  padding: 0 8px 4px;
+  padding: 2px 8px 6px;
+}
+
+.brand svg {
+  display: block;
 }
 
 .brand small {
   display: block;
   font-family: var(--body);
   font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #8fa3b8;
-  margin-top: 3px;
+  color: var(--night-muted);
+  margin-top: 10px;
 }
 
 .nav-group {
@@ -119,7 +137,7 @@ a {
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #7f95ab;
+  color: var(--night-muted);
 }
 
 .nav-link {
@@ -130,7 +148,7 @@ a {
   border-radius: var(--radius);
   font-size: 14px;
   font-weight: 500;
-  color: #c6d2de;
+  color: var(--night-muted);
   transition: background 0.12s, color 0.12s;
 }
 
@@ -140,15 +158,16 @@ a {
 }
 
 .nav-link[aria-current="page"] {
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--orange);
 }
 
 .nav-badge {
   margin-left: auto;
-  background: var(--amber);
-  color: #fff;
+  background: var(--orange);
+  color: var(--on-orange);
   border-radius: 20px;
   font-size: 11px;
   font-weight: 700;
@@ -159,9 +178,9 @@ a {
 .nav-foot {
   margin-top: auto;
   padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--night-line);
   font-size: 12px;
-  color: #9db0c3;
+  color: var(--night-muted);
 }
 
 .main {
@@ -204,7 +223,7 @@ a {
     bottom: 0;
     left: 0;
     right: 0;
-    background: var(--accent);
+    background: var(--night);
     padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
     z-index: 40;
     justify-content: space-around;
@@ -218,14 +237,15 @@ a {
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.03em;
-    color: #9db0c3;
+    color: var(--night-muted);
     padding: 4px 2px;
   }
   .bottom-nav a[aria-current="page"] {
     color: #fff;
+    box-shadow: inset 0 3px 0 var(--orange);
   }
   h1 {
-    font-size: 26px;
+    font-size: 30px;
   }
 }
 
@@ -370,7 +390,13 @@ a {
 }
 
 .mono {
+  font-family: var(--mono);
+  font-size: 0.93em;
   font-variant-numeric: tabular-nums;
+}
+
+.mono.strong {
+  font-weight: 500;
 }
 
 .strong {
@@ -420,6 +446,10 @@ a {
   background: var(--paper-dark);
   color: var(--ink-soft);
 }
+.badge-orange {
+  background: var(--orange-soft);
+  color: var(--orange-text);
+}
 
 /* ---------- Buttons ---------- */
 .btn {
@@ -427,22 +457,27 @@ a {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  font-family: var(--head);
+  font-family: var(--body);
   font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   padding: 9px 15px;
   border-radius: var(--radius);
   border: 1px solid transparent;
   cursor: pointer;
-  background: var(--accent);
-  color: #fff;
+  background: var(--orange);
+  color: var(--on-orange);
   transition: filter 0.12s, background 0.12s;
   text-align: center;
 }
 
 .btn:hover {
-  filter: brightness(1.12);
+  filter: brightness(0.94);
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--steel);
+  outline-offset: 2px;
 }
 
 .btn:disabled {
@@ -461,6 +496,11 @@ a {
   background: var(--paper-dark);
   filter: none;
 }
+.btn-ghost:focus-visible,
+.btn-quiet:focus-visible {
+  outline: 3px solid var(--steel);
+  outline-offset: 2px;
+}
 
 .btn-quiet {
   background: transparent;
@@ -478,9 +518,15 @@ a {
 
 .btn-ok {
   background: var(--ok);
+  color: #fff;
 }
 .btn-danger {
   background: var(--danger);
+  color: #fff;
+}
+.btn-steel {
+  background: var(--steel);
+  color: #fff;
 }
 .btn-sm {
   padding: 5px 11px;
@@ -638,7 +684,7 @@ tbody tr:last-child td {
 }
 
 tbody tr:hover {
-  background: #faf9f5;
+  background: #f4f7f9;
 }
 
 .num {
@@ -749,20 +795,20 @@ tbody tr:hover {
 
 .alert-danger {
   background: var(--danger-soft);
-  border-color: #dfb7ae;
-  color: #7a2c22;
+  border-color: #e1b4ae;
+  color: var(--danger);
 }
 
 .alert-ok {
   background: var(--ok-soft);
-  border-color: #b6cfbc;
-  color: #2c5a37;
+  border-color: #b5d4c0;
+  color: var(--ok);
 }
 
 .alert-amber {
   background: var(--amber-soft);
-  border-color: #dcc79a;
-  color: #7a5c22;
+  border-color: #dec891;
+  color: var(--warn-text);
 }
 
 .divider {
@@ -832,7 +878,7 @@ tbody tr:hover {
   justify-content: center;
   padding: 20px;
   background:
-    radial-gradient(1000px 500px at 50% -10%, #e5e0d4, transparent),
+    radial-gradient(1000px 500px at 50% -10%, #d6e1ea, transparent),
     var(--paper);
 }
 

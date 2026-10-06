@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFormState } from "react-dom";
-import { HardHat } from "lucide-react";
+import { PlumbLockup } from "@/components/logo";
 import { signIn, signUp, type AuthState } from "./actions";
 import { SubmitButton } from "@/components/submit";
 import { Field } from "@/components/ui";
@@ -23,16 +23,10 @@ export function LoginForm({
 
   return (
     <div className="auth-card">
-      <div className="row" style={{ gap: 10, marginBottom: 4 }}>
-        <span
-          className="avatar"
-          style={{ background: "var(--accent)", color: "#fff", width: 34, height: 34 }}
-        >
-          <HardHat size={18} />
-        </span>
-        <div>
-          <h2 style={{ fontSize: 24 }}>Plumb</h2>
-          <div className="tiny muted">{businessName !== "Plumb" ? businessName : "Quotes, jobs, crew and hours"}</div>
+      <div style={{ marginBottom: 4 }}>
+        <PlumbLockup height={46} />
+        <div className="tiny muted" style={{ marginTop: 10 }}>
+          {businessName !== "Plumb" ? businessName : "From quote to finished job."}
         </div>
       </div>
 

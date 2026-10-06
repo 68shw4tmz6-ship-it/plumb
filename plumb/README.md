@@ -151,3 +151,7 @@ supabase/
 - **Uploaded PDF quotes have no line items**, so accepting one creates a job with a single "Site set-up" step for the crew to build on.
 - **Photos upload at full size.** v1 compressed them in the browser first; worth porting that back if the crew are on patchy 4G.
 - **`gst_rate` is per quote**, defaulting to 10. Change the default in `0001_schema.sql` if you ever need to.
+
+## Brand
+
+Plumb has its own identity: a plumb-bob logo, steel blue and Bob Orange, Big Shoulders Display for headings, IBM Plex Sans for the interface and IBM Plex Mono for references and figures. The colour tokens live at the top of `src/app/globals.css`, the logo is the `PlumbLockup` / `PlumbMark` component in `src/components/logo.tsx`, and the SVG and PNG files are in `public/` and `public/brand/`. Rule of thumb: text on an orange fill is always dark (`--on-orange`), never white.

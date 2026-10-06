@@ -17,7 +17,17 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: "That email and password combination didn't work." };
+    const msg = (error.message || "").toLowerCase();
+    if (msg.includes("not confirmed")) {
+      return {
+        error:
+          "Your email isn't confirmed yet. Open the confirmation email we sent you, or ask the admin to confirm it.",
+      };
+    }
+    if (msg.includes("invalid login")) {
+      return { error: "That email and password combination didn't work." };
+    }
+    return { error: error.message };
   }
 
   revalidatePath("/", "layout");

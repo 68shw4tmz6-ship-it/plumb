@@ -126,7 +126,7 @@ export function QuotePdfButton({
       const colUnit = W - M - 150;
       const colAmount = W - M;
 
-      doc.setFillColor(237, 234, 225);
+      doc.setFillColor(233, 237, 240);
       doc.rect(M, y - 12, W - M * 2, 20, "F");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);

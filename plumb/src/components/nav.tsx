@@ -14,6 +14,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { PlumbLockup } from "@/components/logo";
 
 export type NavItem = {
   href: string;
@@ -54,8 +55,11 @@ export function SideNav({
   return (
     <aside className="sidebar">
       <div className="brand">
-        {businessName}
-        <small>Plumb · {role === "boss" ? "Office" : "Crew"}</small>
+        <PlumbLockup height={34} reverse />
+        <small>
+          {businessName !== "Plumb" ? `${businessName} · ` : ""}
+          {role === "boss" ? "Office" : "Crew"}
+        </small>
       </div>
       <nav className="stack-sm" style={{ marginTop: 16 }}>
         {items.map((item) => (
@@ -72,14 +76,14 @@ export function SideNav({
         ))}
       </nav>
       <div className="nav-foot">
-        <div className="strong" style={{ color: "#e9edf2" }}>
+        <div className="strong" style={{ color: "var(--night-ink)" }}>
           {userName}
         </div>
         <form action="/auth/signout" method="post">
           <button
             type="submit"
             className="btn-quiet"
-            style={{ color: "#9db0c3", padding: "4px 0", fontSize: 12 }}
+            style={{ color: "var(--night-muted)", padding: "4px 0", fontSize: 12 }}
           >
             Sign out
           </button>

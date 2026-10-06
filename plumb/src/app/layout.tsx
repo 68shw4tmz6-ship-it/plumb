@@ -7,11 +7,17 @@ export const metadata: Metadata = {
   description: "Quotes, jobs, crew and hours in one place.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
-  icons: { icon: "/favicon.png", apple: "/apple-touch-icon.png" },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#28374A",
+  themeColor: "#12293D",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
