@@ -4,7 +4,38 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireBoss } from "@/lib/auth";
+import { extractQuoteLines } from "@/lib/pdf-lines";
+import { unitLabel } from "@/lib/format";
 import type { QuoteLineKind, QuoteStatus } from "@/lib/types";
+
+type Supabase = ReturnType<typeof createClient>;
+
+/**
+ * Reads the line items out of a PDF and saves them on the quote. Best effort: a
+ * scanned PDF or an odd layout just yields nothing, it never blocks the upload.
+ * Returns how many lines were saved.
+ */
+async function saveLinesFromPdf(
+  supabase: Supabase,
+  quoteId: string,
+  data: ArrayBuffer,
+  replace: boolean,
+): Promise<{ saved: number; hadText: boolean }> {
+  try {
+    const { lines, hadText } = await extractQuoteLines(data);
+    if (!lines.length) return { saved: 0, hadText };
+    if (replace) {
+      await supabase.from("quote_lines").delete().eq("quote_id", quoteId);
+    }
+    const { error } = await supabase
+      .from("quote_lines")
+      .insert(lines.map((l, i) => ({ ...l, quote_id: quoteId, position: i })));
+    if (error) return { saved: 0, hadText };
+    return { saved: lines.length, hadText };
+  } catch {
+    return { saved: 0, hadText: true };
+  }
+}
 
 type LineInput = {
   kind: QuoteLineKind;
@@ -127,6 +158,11 @@ export async function uploadQuote(formData: FormData) {
       .upload(path, file, { upsert: true, contentType: file.type || "application/pdf" });
     if (upErr) throw new Error(`Quote saved, but the file didn't upload: ${upErr.message}`);
     await supabase.from("quotes").update({ file_path: path }).eq("id", quote.id);
+    if (ext === "pdf") {
+      const read = await saveLinesFromPdf(supabase, quote.id, await file.arrayBuffer(), false);
+      revalidatePath("/quotes");
+      redirect(`/quotes/${quote.id}?lines_read=${read.saved}${read.hadText ? "" : "&scanned=1"}`);
+    }
   }
 
   revalidatePath("/quotes");
@@ -154,7 +190,130 @@ export async function attachQuoteFile(formData: FormData) {
   if (error) throw new Error(error.message);
 
   await supabase.from("quotes").update({ file_path: path }).eq("id", id);
+
+  if (ext === "pdf") {
+    const { count } = await supabase
+      .from("quote_lines")
+      .select("id", { count: "exact", head: true })
+      .eq("quote_id", id);
+    if (!count) {
+      const read = await saveLinesFromPdf(supabase, id, await file.arrayBuffer(), false);
+      revalidatePath(`/quotes/${id}`);
+      redirect(`/quotes/${id}?lines_read=${read.saved}${read.hadText ? "" : "&scanned=1"}`);
+    }
+  }
   revalidatePath(`/quotes/${id}`);
+}
+
+/** Re-reads the attached PDF and replaces the quote's lines with what it finds. */
+export async function readLinesFromPdf(formData: FormData) {
+  await requireBoss();
+  const supabase = createClient();
+  const id = String(formData.get("quote_id"));
+
+  const { data: quote } = await supabase
+    .from("quotes")
+    .select("file_path")
+    .eq("id", id)
+    .single();
+  if (!quote?.file_path) redirect(`/quotes/${id}?lines_read=0&nofile=1`);
+
+  const { data: blob, error } = await supabase.storage.from("quotes").download(quote.file_path);
+  if (error || !blob) redirect(`/quotes/${id}?lines_read=0&nofile=1`);
+
+  const read = await saveLinesFromPdf(supabase, id, await blob.arrayBuffer(), true);
+  revalidatePath(`/quotes/${id}`);
+  redirect(`/quotes/${id}?lines_read=${read.saved}${read.hadText ? "" : "&scanned=1"}`);
+}
+
+const qtyText = (qty: number, unit: string) =>
+  `${Number(qty).toLocaleString("en-AU", { maximumFractionDigits: 3 })} ${unitLabel(unit)}`;
+
+/**
+ * Brings the job in line with the quote's lines: every work line becomes a step,
+ * every material line lands on the shopping list. Never touches progress or
+ * assignments, never removes anything the crew has worked on, and never copies a
+ * price (the crew can't see prices). Safe to run again after editing the lines.
+ */
+async function syncJob(supabase: Supabase, quoteId: string, projectId: string) {
+  const [{ data: lines }, { data: steps }, { data: mats }] = await Promise.all([
+    supabase.from("quote_lines").select("*").eq("quote_id", quoteId).order("position"),
+    supabase
+      .from("project_steps")
+      .select("id, label, detail, status, assignee_id, position")
+      .eq("project_id", projectId),
+    supabase.from("project_materials").select("id, label").eq("project_id", projectId),
+  ]);
+
+  const workLines = (lines ?? []).filter((l) => l.kind === "work");
+  const materialLines = (lines ?? []).filter((l) => l.kind === "material");
+  const existingSteps = steps ?? [];
+  const norm = (t: string) => t.trim().toLowerCase();
+  const stepByLabel = new Map(existingSteps.map((s) => [norm(s.label), s]));
+  const matLabels = new Set((mats ?? []).map((m) => norm(m.label)));
+
+  let addedSteps = 0;
+  let addedMaterials = 0;
+
+  for (const l of workLines) {
+    const detail = [qtyText(l.qty, l.unit), l.detail].filter(Boolean).join(" — ");
+    const found = stepByLabel.get(norm(l.label));
+    if (found) {
+      if (!found.detail) {
+        await supabase.from("project_steps").update({ detail }).eq("id", found.id);
+      }
+    } else {
+      const { error } = await supabase.from("project_steps").insert({
+        project_id: projectId,
+        position: l.position,
+        label: l.label,
+        detail,
+      });
+      if (!error) addedSteps++;
+    }
+  }
+
+  // The placeholder only exists because the quote had no lines. Drop it once real
+  // steps are in, as long as nobody has started on it.
+  if (workLines.length) {
+    const placeholder = existingSteps.find(
+      (s) =>
+        norm(s.label) === "site set-up" &&
+        !s.detail &&
+        s.status === "todo" &&
+        !s.assignee_id &&
+        !workLines.some((l) => norm(l.label) === "site set-up"),
+    );
+    if (placeholder) await supabase.from("project_steps").delete().eq("id", placeholder.id);
+  }
+
+  for (const l of materialLines) {
+    if (matLabels.has(norm(l.label))) continue;
+    const { error } = await supabase.from("project_materials").insert({
+      project_id: projectId,
+      label: l.label,
+      qty: l.qty,
+      unit: l.unit,
+    });
+    if (!error) addedMaterials++;
+  }
+
+  return { addedSteps, addedMaterials };
+}
+
+/** Button on the quote page: refresh the job from the quote's current lines. */
+export async function syncJobFromQuote(formData: FormData) {
+  await requireBoss();
+  const supabase = createClient();
+  const id = String(formData.get("quote_id"));
+  const projectId = await jobIdForQuote(supabase, id);
+  if (!projectId) redirect(`/quotes/${id}`);
+
+  const { addedSteps, addedMaterials } = await syncJob(supabase, id, projectId);
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/quotes/${id}`);
+  redirect(`/quotes/${id}?job_synced=${addedSteps}-${addedMaterials}`);
 }
 
 export async function setQuoteStatus(formData: FormData) {
@@ -178,14 +337,46 @@ export async function setQuoteStatus(formData: FormData) {
   // Accepting a quote fires the trigger that builds the job; pick up its id so
   // we can send the boss straight there.
   if (status === "accepted") {
-    const { data } = await supabase.from("quotes").select("project_id").eq("id", id).single();
+    let projectId = await jobIdForQuote(supabase, id);
+    if (!projectId) {
+      // The database trigger should already have built the job. If it didn't, build it
+      // now and show the real error on the quote page instead of failing silently.
+      const { error: jobError } = await supabase.rpc("create_project_from_quote", {
+        p_quote_id: id,
+      });
+      if (jobError) redirect(`/quotes/${id}?job_error=${encodeURIComponent(jobError.message)}`);
+      projectId = await jobIdForQuote(supabase, id);
+    }
+    if (projectId) await syncJob(supabase, id, projectId);
     revalidatePath("/projects");
     revalidatePath(`/quotes/${id}`);
-    if (data?.project_id) redirect(`/projects/${data.project_id}?from=quote`);
+    if (projectId) redirect(`/projects/${projectId}?from=quote`);
   }
 
   revalidatePath("/quotes");
   revalidatePath(`/quotes/${id}`);
+}
+
+async function jobIdForQuote(supabase: Supabase, quoteId: string) {
+  const { data } = await supabase.from("quotes").select("project_id").eq("id", quoteId).single();
+  return (data?.project_id as string | null) ?? null;
+}
+
+/** Builds the job for an accepted quote that doesn't have one yet. Safe to run twice. */
+export async function createJobFromQuote(formData: FormData) {
+  await requireBoss();
+  const supabase = createClient();
+  const id = String(formData.get("quote_id"));
+
+  const { error } = await supabase.rpc("create_project_from_quote", { p_quote_id: id });
+  if (error) redirect(`/quotes/${id}?job_error=${encodeURIComponent(error.message)}`);
+
+  const projectId = await jobIdForQuote(supabase, id);
+  if (projectId) await syncJob(supabase, id, projectId);
+  revalidatePath("/projects");
+  revalidatePath(`/quotes/${id}`);
+  if (projectId) redirect(`/projects/${projectId}?from=quote`);
+  redirect(`/quotes/${id}`);
 }
 
 export async function logFollowUp(formData: FormData) {

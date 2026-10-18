@@ -5,7 +5,9 @@ import {
   BellRing,
   CheckCircle2,
   FileText,
+  FileSearch,
   History,
+  RefreshCw,
   Paperclip,
   Send,
   Settings2,
@@ -23,7 +25,10 @@ import {
   addQuoteLine,
   deleteQuote,
   deleteQuoteLine,
+  createJobFromQuote,
+  readLinesFromPdf,
   setQuoteStatus,
+  syncJobFromQuote,
   updateFollowUpSettings,
   updateQuoteLine,
 } from "../actions";
@@ -57,8 +62,16 @@ const KIND_LABEL: Record<QuoteLineKind, string> = {
 
 export default async function QuoteDetailPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: {
+    job_error?: string;
+    lines_read?: string;
+    scanned?: string;
+    nofile?: string;
+    job_synced?: string;
+  };
 }) {
   const profile = await requireBoss();
   const supabase = createClient();
@@ -111,13 +124,61 @@ export default async function QuoteDetailPage({
   const today = todayIso();
   const nudgeDue =
     q.status === "sent" && q.next_follow_up_on !== null && q.next_follow_up_on <= today;
-  const editable = q.status === "draft" || q.status === "sent";
+  const isUploaded = q.source === "uploaded";
+  // An accepted uploaded quote can still have its lines tidied (its price is the PDF's,
+  // so editing lines never moves it), which lets the boss fill in the job afterwards.
+  const editable =
+    q.status === "draft" || q.status === "sent" || (isUploaded && q.status === "accepted");
+  const linesTotal = lineRows.reduce((sum, l) => sum + Number(l.amount ?? 0), 0);
+  const linesMismatch =
+    isUploaded && lineRows.length > 0 && Math.abs(linesTotal - Number(q.amount_ex_gst)) > 0.5;
+  const linesRead = searchParams.lines_read !== undefined ? Number(searchParams.lines_read) : null;
+  const [syncedSteps, syncedMaterials] = (searchParams.job_synced ?? "")
+    .split("-")
+    .map((n) => Number(n));
 
   return (
     <>
       <Link href="/quotes" className="btn-quiet" style={{ marginBottom: 6 }}>
         <ArrowLeft size={15} /> Quotes
       </Link>
+
+      {searchParams.job_error ? (
+        <div style={{ marginBottom: 12 }}>
+          <Alert tone="danger">
+            The job couldn&apos;t be created: {searchParams.job_error}
+          </Alert>
+        </div>
+      ) : null}
+
+      {linesRead !== null && linesRead > 0 ? (
+        <div style={{ marginBottom: 12 }}>
+          <Alert tone="ok">
+            Read {linesRead} line{linesRead === 1 ? "" : "s"} from the PDF. Check them below, fix
+            anything that looks off, then they become the steps and shopping list of the job.
+          </Alert>
+        </div>
+      ) : null}
+      {linesRead === 0 ? (
+        <div style={{ marginBottom: 12 }}>
+          <Alert tone="amber">
+            {searchParams.nofile
+              ? "There's no PDF attached to this quote yet."
+              : searchParams.scanned
+                ? "This PDF looks like a scan or a photo, so there's no text to read."
+                : "Couldn't find any priced lines in this PDF."}{" "}
+            Add the lines by hand below (work = a step on the job, material = the shopping list).
+          </Alert>
+        </div>
+      ) : null}
+      {searchParams.job_synced !== undefined ? (
+        <div style={{ marginBottom: 12 }}>
+          <Alert tone="ok">
+            Job updated: {syncedSteps || 0} new step{syncedSteps === 1 ? "" : "s"} and{" "}
+            {syncedMaterials || 0} new material{syncedMaterials === 1 ? "" : "s"} added.
+          </Alert>
+        </div>
+      ) : null}
 
       <PageHead
         title={q.title}
@@ -182,19 +243,39 @@ export default async function QuoteDetailPage({
               </p>
             ) : null}
 
-            {q.source === "uploaded" ? (
-              <div className="stack-sm">
+            {isUploaded ? (
+              <div className="stack-sm" style={{ marginBottom: 14 }}>
                 <div className="row-between">
                   <span className="muted small">Uploaded PDF quote</span>
                   <span className="mono strong">{currency(q.amount_inc_gst)} inc GST</span>
                 </div>
                 <p className="tiny muted" style={{ margin: 0 }}>
-                  No line items on an uploaded quote — accepting it creates the job with a
-                  single &quot;Site set-up&quot; step for the crew to build on.
+                  The price is the one on the PDF. The lines below are what the crew sees on the
+                  job (quantities only, never prices): each work line becomes a step, each
+                  material line goes on the shopping list.
                 </p>
+                {linesMismatch ? (
+                  <Alert tone="amber">
+                    The lines add up to {currency(linesTotal)} ex GST but the quote is{" "}
+                    {currency(q.amount_ex_gst)}. That doesn&apos;t change the job, it just means a
+                    line is missing or misread.
+                  </Alert>
+                ) : null}
+                {editable && q.file_path ? (
+                  <form action={readLinesFromPdf} className="row" style={{ gap: 8 }}>
+                    <input type="hidden" name="quote_id" value={q.id} />
+                    <SubmitButton className="btn btn-ghost btn-sm" pendingLabel="Reading…">
+                      <FileSearch size={14} /> {lineRows.length ? "Re-read" : "Read"} the lines from
+                      the PDF
+                    </SubmitButton>
+                    {lineRows.length ? (
+                      <span className="tiny muted">Replaces the lines below.</span>
+                    ) : null}
+                  </form>
+                ) : null}
               </div>
-            ) : (
-              <>
+            ) : null}
+            <>
                 <div className="table-wrap">
                   <table>
                     <thead>
@@ -371,7 +452,6 @@ export default async function QuoteDetailPage({
                   </div>
                 </div>
               </>
-            )}
           </Card>
 
           {q.status === "sent" ? (
@@ -463,10 +543,32 @@ export default async function QuoteDetailPage({
                 <div className="alert alert-ok">
                   Accepted {shortDate(q.decided_at)}.{" "}
                   {q.project_id ? (
-                    <Link href={`/projects/${q.project_id}`} className="strong">
-                      Open the job →
-                    </Link>
-                  ) : null}
+                    <div className="stack-sm">
+                      <Link href={`/projects/${q.project_id}`} className="strong">
+                        Open the job →
+                      </Link>
+                      <form action={syncJobFromQuote}>
+                        <input type="hidden" name="quote_id" value={q.id} />
+                        <SubmitButton className="btn btn-ghost btn-sm" pendingLabel="Updating…">
+                          <RefreshCw size={14} /> Update the job from the lines
+                        </SubmitButton>
+                      </form>
+                      <div className="tiny muted">
+                        Adds any missing steps and materials. Nothing already on the job is
+                        removed or reset.
+                      </div>
+                    </div>
+                  ) : (
+                    <form action={createJobFromQuote} style={{ marginTop: 8 }}>
+                      <input type="hidden" name="quote_id" value={q.id} />
+                      <div className="tiny" style={{ marginBottom: 6 }}>
+                        No job exists for this quote yet.
+                      </div>
+                      <SubmitButton className="btn btn-sm" pendingLabel="Creating…">
+                        <HardHat size={15} /> Create the job now
+                      </SubmitButton>
+                    </form>
+                  )}
                 </div>
               ) : null}
 
