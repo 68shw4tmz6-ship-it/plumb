@@ -57,13 +57,13 @@ export default async function CrewJobPage({ params }: { params: { id: string } }
   const [steps, materials, members, reports, files, myHours] = await Promise.all([
     supabase
       .from("project_steps")
-      .select("*, profiles(full_name)")
+      .select("*, profiles!project_steps_assignee_id_fkey(full_name)")
       .eq("project_id", p.id)
       .order("position"),
     supabase.from("project_materials").select("*").eq("project_id", p.id).order("created_at"),
     supabase
       .from("project_members")
-      .select("*, profiles(id, full_name, role, trade, phone, is_active)")
+      .select("*, profiles!project_members_profile_id_fkey(id, full_name, role, trade, phone, is_active)")
       .eq("project_id", p.id),
     supabase
       .from("project_reports")

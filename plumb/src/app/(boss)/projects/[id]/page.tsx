@@ -65,7 +65,7 @@ export default async function ProjectDetailPage({
 
   const { data: project } = await supabase
     .from("projects")
-    .select("*, clients(*), quotes(id, reference)")
+    .select("*, clients(*), quotes!projects_quote_id_fkey(id, reference)")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -78,7 +78,7 @@ export default async function ProjectDetailPage({
   const [steps, materials, members, reports, files, team, clients, hours] = await Promise.all([
     supabase
       .from("project_steps")
-      .select("*, profiles(full_name)")
+      .select("*, profiles!project_steps_assignee_id_fkey(full_name)")
       .eq("project_id", p.id)
       .order("position"),
     supabase
@@ -88,7 +88,7 @@ export default async function ProjectDetailPage({
       .order("created_at"),
     supabase
       .from("project_members")
-      .select("*, profiles(id, full_name, role, trade, phone, is_active)")
+      .select("*, profiles!project_members_profile_id_fkey(id, full_name, role, trade, phone, is_active)")
       .eq("project_id", p.id),
     supabase
       .from("project_reports")
@@ -105,7 +105,7 @@ export default async function ProjectDetailPage({
     supabase.from("clients").select("id, name").order("name"),
     supabase
       .from("timesheet_entries")
-      .select("hours, is_approved, profile_id, profiles(full_name)")
+      .select("hours, is_approved, profile_id, profiles!timesheet_entries_profile_id_fkey(full_name)")
       .eq("project_id", p.id),
   ]);
 

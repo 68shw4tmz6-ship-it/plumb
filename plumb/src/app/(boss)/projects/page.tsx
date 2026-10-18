@@ -38,7 +38,7 @@ export default async function ProjectsPage({
 
   let query = supabase
     .from("projects")
-    .select("*, clients(name), project_members(profile_id, profiles(full_name))")
+    .select("*, clients(name), project_members(profile_id, profiles!project_members_profile_id_fkey(full_name))")
     .order("deadline", { ascending: true, nullsFirst: false });
 
   if (filter === "live") query = query.not("status", "in", "(done,cancelled)");

@@ -50,7 +50,7 @@ export default async function TimesheetsPage({
   const [{ data: entries }, { data: people }] = await Promise.all([
     supabase
       .from("timesheet_entries")
-      .select("*, profiles(full_name, hourly_rate), projects(name)")
+      .select("*, profiles!timesheet_entries_profile_id_fkey(full_name, hourly_rate), projects(name)")
       .gte("work_date", iso(weekStart))
       .lte("work_date", iso(weekEnd))
       .order("work_date"),
